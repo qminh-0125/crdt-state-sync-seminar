@@ -1,0 +1,18 @@
+[
+  {
+    "CaseId": "ERR_RESURRECTION_01",
+    "Scenario": "Exp1_OutOfOrder_Network_Jitter",
+    "AffectedItem": "Item_139",
+    "OperationHistory": "REMOVE@(8670, client_6) -\u003E ADD@(9477, client_6) -\u003E REMOVE@(9675, client_0)",
+    "BaselineOutcome": "SAI L\u1EC6CH: M\u1EB7t h\u00E0ng \u0027Item_139\u0027 \u0111\u00E3 b\u1ECB REMOVE nh\u01B0ng g\u00F3i tin ADD c\u0169 \u0111\u1EBFn mu\u1ED9n sau khi x\u00F3a (do Jitter 80ms), khi\u1EBFn Baseline kh\u00F4ng c\u00F3 Tombstone t\u1EF1 \u0111\u1ED9ng th\u00EAm l\u1EA1i m\u1EB7t h\u00E0ng v\u00E0o gi\u1ECF (Resurrection Anomaly).",
+    "CrdtOutcome": "\u0110\u00DANG \u0110\u1EAEN: CRDT gi\u1EEF Tombstone trong Remove-Set v\u1EDBi Timestamp l\u1EDBn h\u01A1n n\u00EAn ch\u1EB7n g\u00F3i tin ADD c\u0169 \u0111\u1EBFn tr\u1EC5; m\u1ECDi Replica \u0111\u1EC1u th\u1ED1ng nh\u1EA5t \u0027Item_139\u0027 \u0111\u00E3 b\u1ECB x\u00F3a."
+  },
+  {
+    "CaseId": "ERR_SPLIT_BRAIN_02",
+    "Scenario": "Exp3_NetworkPartition_SplitBrain_Heal",
+    "AffectedItem": "SharedCartItem_189",
+    "OperationHistory": "Partition Group 1 [node_0, node_1] REMOVE \u0027SharedCartItem_189\u0027 || Partition Group 2 [node_2, node_3] gi\u1EEF b\u1EA3n sao c\u0169 c\u1EE7a \u0027SharedCartItem_189\u0027",
+    "BaselineOutcome": "TH\u1EA4T B\u1EA0I KHI H\u1ED8I T\u1EE4: Trong l\u00FAc \u0111\u1EE9t m\u1EA1ng (20000 g\u00F3i tin xuy\u00EAn ph\u00E2n v\u00F9ng b\u1ECB ch\u1EB7n), Group 1 \u0111\u00E3 x\u00F3a \u0027SharedCartItem_189\u0027. Khi n\u1ED1i l\u1EA1i m\u1EA1ng v\u00E0 ch\u1EA1y Naive Merge, v\u00EC kh\u00F4ng c\u00F3 Tombstone n\u00EAn \u0027SharedCartItem_189\u0027 t\u1EEB Group 2 b\u1ECB copy ng\u01B0\u1EE3c l\u1EA1i sang Group 1 (L\u1ED7i 26.8% gi\u1ECF h\u00E0ng).",
+    "CrdtOutcome": "T\u1EF0 PH\u1EE4C H\u1ED2I 100%: Khi n\u1ED1i l\u1EA1i m\u1EA1ng, h\u00E0m Merge c\u1EE7a CRDT h\u1EE3p nh\u1EA5t c\u1EA3 Add-Set v\u00E0 Remove-Set (LUB). Tombstone t\u1EEB Group 1 gi\u00FAp Group 2 nh\u1EADn bi\u1EBFt \u0027SharedCartItem_189\u0027 \u0111\u00E3 b\u1ECB x\u00F3a m\u00E0 kh\u00F4ng c\u1EA7n con ng\u01B0\u1EDDi can thi\u1EC7p."
+  }
+]
