@@ -83,18 +83,29 @@ public class NaiveLWWSet<T> where T : notnull
         }
     }
 
-    public (long PayloadBytes, long EstimatedRamBytes) CalculateMemoryFootprint()
+    /// <summary>
+    /// Số lượng Tombstone của Naive LWW (luôn bằng số bản ghi xóa được lưu = 0 vì Naive LWW xóa trực tiếp khỏi _items).
+    /// </summary>
+    public int TombstoneCount => 0;
+
+    /// <summary>
+    /// Đo lường kích thước PayloadBytes, MetadataBytes (Timestamp đi kèm mỗi item đang active) và RAM.
+    /// </summary>
+    public (long PayloadBytes, long MetadataBytes, double OverheadPercentage, long EstimatedRamBytes) CalculateOverhead()
     {
         lock (_lock)
         {
             long payloadBytes = 0;
-            foreach (var elem in _items.Keys)
+            long metadataBytes = 0;
+            foreach (var (elem, _) in _items)
             {
                 int keyBytes = Encoding.UTF8.GetByteCount(elem.ToString() ?? string.Empty);
                 payloadBytes += keyBytes + 48;
+                metadataBytes += sizeof(long) + 4; // 12B Timestamp cho mỗi phần tử hiện có
             }
-            long ramBytes = payloadBytes + _items.Count * 32L;
-            return (payloadBytes, ramBytes);
+            long ramBytes = payloadBytes + metadataBytes + _items.Count * 32L;
+            double ratio = payloadBytes > 0 ? (double)metadataBytes / payloadBytes * 100.0 : 0.0;
+            return (payloadBytes, metadataBytes, ratio, ramBytes);
         }
     }
 

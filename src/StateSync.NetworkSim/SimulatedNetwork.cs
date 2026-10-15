@@ -26,7 +26,7 @@ public class SimulatedNetwork
     private readonly Random _random;
     private readonly Dictionary<string, Action<NetworkMessage>> _handlers = new();
     private readonly List<NetworkMessage> _virtualQueue = new();
-    private readonly List<long> _latenciesMs = new();
+    private readonly List<double> _latenciesMs = new();
     private readonly object _lock = new();
 
     // Quản lý phân vùng mạng (Network Partition / Split-Brain)
@@ -140,7 +140,6 @@ public class SimulatedNetwork
             );
 
             _virtualQueue.Add(msg);
-            _latenciesMs.Add(deliveryTime - currentVirtualTimeMs);
 
             // 4. Giả lập gói tin lặp lại (Duplication)
             if (_config.DuplicationRate > 0 && _random.NextDouble() < _config.DuplicationRate)
@@ -175,14 +174,16 @@ public class SimulatedNetwork
             _virtualQueue.Clear();
         }
 
+        var flushSw = System.Diagnostics.Stopwatch.StartNew();
         foreach (var msg in orderedMessages)
         {
-            Deliver(msg);
+            Deliver(msg, flushSw.Elapsed.TotalMilliseconds);
         }
+        flushSw.Stop();
     }
 
     /// <summary>
-    /// Tính toán phân vị độ trễ thứ 95 (P95 Latency) từ tập dữ liệu đo thực tế.
+    /// Tính toán phân vị độ trễ thứ 95 (P95 Latency) từ tập dữ liệu đo thực tế (Network Delay + CPU Handler Time).
     /// </summary>
     public double GetP95LatencyMs()
     {
@@ -235,19 +236,20 @@ public class SimulatedNetwork
 
         _ = Task.Run(async () =>
         {
+            var realSw = System.Diagnostics.Stopwatch.StartNew();
             if (latency > 0) await Task.Delay(latency);
-            Deliver(msg);
+            Deliver(msg, realSw.Elapsed.TotalMilliseconds);
 
             if (duplicate)
             {
                 TotalDuplicated++;
                 await Task.Delay(20);
-                Deliver(msg);
+                Deliver(msg, realSw.Elapsed.TotalMilliseconds);
             }
         });
     }
 
-    private void Deliver(NetworkMessage msg)
+    private void Deliver(NetworkMessage msg, double queueElapsedMs)
     {
         Action<NetworkMessage>? handler;
         lock (_lock)
@@ -257,8 +259,17 @@ public class SimulatedNetwork
 
         if (handler != null)
         {
-            TotalDelivered++;
+            long startTicks = System.Diagnostics.Stopwatch.GetTimestamp();
             handler(msg);
+            long endTicks = System.Diagnostics.Stopwatch.GetTimestamp();
+            double cpuApplyMs = (double)(endTicks - startTicks) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+            double totalEndToEndMs = (msg.DeliveryTimeMs - msg.SendTimeMs) + queueElapsedMs + cpuApplyMs;
+
+            lock (_lock)
+            {
+                TotalDelivered++;
+                _latenciesMs.Add(totalEndToEndMs);
+            }
         }
     }
 }
