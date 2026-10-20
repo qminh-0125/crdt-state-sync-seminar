@@ -1,6 +1,6 @@
 # StateSync: CRDT cho đồng bộ giỏ hàng chia sẻ
 
-**Seminar Kỹ nghệ Phần mềm — Trần Quang Minh — MSSV 23110187**
+**Seminar — Trần Quang Minh — MSSV 23110187**
 
 Tên đề tài: Mô hình hóa và cài đặt thuật toán đồng bộ CRDT cho ứng dụng web chia sẻ trạng thái thời gian thực.
 
