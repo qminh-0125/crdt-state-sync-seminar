@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>StateSync — CRDT vs Naive LWW SignalR Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 24px; }
+        .container { max-width: 1100px; margin: 0 auto; }
+        h1 { font-size: 1.6rem; margin-bottom: 4px; color: #38bdf8; }
+        .subtitle { color: #94a3b8; font-size: 0.95rem; margin-bottom: 20px; }
+        .controls { background: #1e293b; padding: 16px; border-radius: 10px; margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+        button { background: #0284c7; color: white; border: none; padding: 10px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+        button:hover { background: #0369a1; }
+        button.warn { background: #e11d48; }
+        button.warn:hover { background: #be123c; }
+        button.gc { background: #059669; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .card { background: #1e293b; border-radius: 10px; padding: 18px; border: 1px solid #334155; }
+        .card h2 { margin-top: 0; font-size: 1.2rem; }
+        .crdt-title { color: #4ade80; }
+        .base-title { color: #f87171; }
+        ul { list-style: none; padding: 0; }
+        li { background: #0f172a; padding: 10px 12px; margin-bottom: 8px; border-radius: 6px; display: flex; justify-content: space-between; }
+        .metrics { margin-top: 16px; background: #0f172a; padding: 12px; border-radius: 8px; font-size: 0.9rem; color: #cbd5e1; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>StateSync: Collaborative Shopping Cart (ASP.NET Core SignalR)</h1>
+        <div class="subtitle">Đối chứng trực tiếp giữa <b>CRDT (LWW-Element-Set)</b> và <b>Baseline (Naive LWW)</b> dưới điều kiện mạng trễ / đảo thứ tự gói tin</div>
+
+        <div class="controls">
+            <button onclick="addItem('LAPTOP_01', 'MacBook Pro M4', 2499, 1)">+ Thêm MacBook Pro (Qty=1)</button>
+            <button onclick="addItem('LAPTOP_01', 'MacBook Pro M4', 2499, 2)">+ Cập nhật MacBook Pro (Qty=2)</button>
+            <button onclick="addItem('MOUSE_02', 'Logitech MX Master', 99, 1)">+ Thêm Chuột Logitech</button>
+            <button onclick="removeItem('LAPTOP_01', 'MacBook Pro M4', 2499)">- Xóa MacBook Pro</button>
+            <button class="warn" onclick="simulateAnomaly()">⚡ Tiêm lỗi Đảo thứ tự Gói tin (Out-of-Order Anomaly)</button>
+            <button class="gc" onclick="runGc()">🧹 Thu gọn Tombstone trên server</button>
+        </div>
+
+        <div class="metrics" id="statusBox">Trạng thái: Đang kết nối SignalR Hub...</div>
+
+        <div class="grid" style="margin-top: 20px;">
+            <div class="card">
+                <h2 class="crdt-title">✅ Kiến trúc Đề xuất: CRDT (LWW-Element-Set)</h2>
+                <p style="color:#94a3b8;font-size:0.85rem;">Demo trạng thái tập trung — Tombstone &amp; GC Cutoff chặn thao tác cũ. Thí nghiệm nhiều replica nằm trong benchmark.</p>
+                <ul id="crdtList"></ul>
+            </div>
+            <div class="card">
+                <h2 class="base-title">❌ Kiến trúc Đối chứng: Baseline (Naive LWW)</h2>
+                <p style="color:#94a3b8;font-size:0.85rem;">Không có Tombstone — Bị lỗi Resurrection (mặt hàng đã xóa tự sống lại khi mạng lag)</p>
+                <ul id="baseList"></ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mỗi tab trình duyệt có định danh clientId độc lập lưu trong sessionStorage (BUG-03)
+        let tabClientId = sessionStorage.getItem("statesync_tab_client_id");
+        if (!tabClientId) {
+            const randSuffix = (window.crypto && window.crypto.randomUUID)
+                ? window.crypto.randomUUID()
+                : Math.random().toString(36).substring(2, 10);
+            tabClientId = `web_tab_${randSuffix}`;
+            sessionStorage.setItem("statesync_tab_client_id", tabClientId);
+        }
+
+        // Đồng hồ logic Lamport được lưu bền vững và đồng bộ theo tiến độ thực của Server (BUG-03)
+        const savedTick = Number(sessionStorage.getItem("statesync_logical_tick") || 300);
+        let tick = Number.isSafeInteger(savedTick) && savedTick > 0 ? savedTick : 300;
+        let lastVersion = -1;
+        let ready = false;
+
+        function setReady(value) {
+            ready = value;
+            document.querySelectorAll("button").forEach(button => button.disabled = !value);
+        }
+        function showError(error) {
+            document.getElementById("statusBox").textContent = `Lỗi kết nối/thao tác: ${error.message || error}`;
+        }
+        setReady(false);
+
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl("/hubs/statesync")
+            .withAutomaticReconnect()
+            .build();
+
+        connection.on("StateUpdated", (data) => {
+            // Parallel Hub invocations may complete broadcasts in a different order.
+            if (data.version < lastVersion) return;
+            lastVersion = data.version;
+            if (typeof data.serverLogicalTick === "number" && data.serverLogicalTick > tick) {
+                tick = data.serverLogicalTick;
+                sessionStorage.setItem("statesync_logical_tick", String(tick));
+            }
+
+            const overheadText = data.overheadDisplay || `${data.overheadPercent.toFixed(1)}%`;
+            document.getElementById("statusBox").textContent =
+                `Tab ID: ${tabClientId} | Clock: t=${tick} | Sự kiện cuối: ${data.lastEvent} | Tombstones: ${data.tombstoneCount} | Metadata Overhead (Ước lượng): ${overheadText} | RAM (Ước lượng): ${data.ramKb.toFixed(2)} KB`;
+
+            const render = (id, items) => {
+                const list = document.getElementById(id);
+                list.replaceChildren();
+                for (const item of items) {
+                    const row = document.createElement("li");
+                    row.textContent = `${item.name} (${item.productId}) × Qty: ${item.quantity} — $${item.price}`;
+                    list.appendChild(row);
+                }
+                if (items.length === 0) {
+                    const row = document.createElement("li");
+                    row.textContent = "Giỏ hàng trống";
+                    list.appendChild(row);
+                }
+            };
+            render("crdtList", data.crdtItems);
+            render("baseList", data.baselineItems);
+            setReady(true);
+        });
+
+        connection.onreconnecting(() => {
+            lastVersion = -1; // A restarted server starts a new in-memory demo.
+            setReady(false);
+        });
+        connection.onclose(() => setReady(false));
+
+        connection.start().catch(showError);
+
+        function nextTick() {
+            if (!ready) throw new Error("Chờ kết nối và snapshot từ server.");
+            if (tick > 9007199254739990) throw new Error("Đồng hồ đã đạt giới hạn; hãy mở phiên demo mới.");
+            tick += 10;
+            sessionStorage.setItem("statesync_logical_tick", String(tick));
+            return tick;
+        }
+
+        async function addItem(id, name, price, qty = 1) {
+            try {
+                const t = nextTick();
+                await connection.invoke("BroadcastAdd", { productId: id, name: name, price: price, quantity: qty }, t, tabClientId);
+            } catch (error) { showError(error); }
+        }
+
+        async function removeItem(id, name, price) {
+            try {
+                const t = nextTick();
+                await connection.invoke("BroadcastRemove", { productId: id, name: name, price: price, quantity: 1 }, t, tabClientId);
+            } catch (error) { showError(error); }
+        }
+
+        function simulateAnomaly() {
+            connection.invoke("SimulateOutOfOrderAnomaly").catch(showError);
+        }
+
+        function runGc() {
+            connection.invoke("RunGarbageCollection").catch(showError);
+        }
+    </script>
+</body>
+</html>

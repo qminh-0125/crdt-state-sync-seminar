@@ -1,0 +1,18 @@
+[
+  {
+    "CaseId": "ERR_RESURRECTION_01",
+    "Scenario": "Exp1_OutOfOrder_Network_Jitter",
+    "AffectedItem": "Item_067",
+    "OperationHistory": "RECV_ADD@(7009, client_4)(deliver=7117ms) -\u003E RECV_ADD@(7156, client_4)(deliver=7276ms) -\u003E LOCAL_REMOVE@(9974, client_0) -\u003E RECV_ADD@(9835, client_5)(deliver=10012ms)",
+    "BaselineOutcome": "SAI L\u1EC6CH (H\u1ED9i t\u1EE5 c\u1EB7p 0,0%, Kh\u1EDBp Oracle 10,0%, Sai l\u1EC7ch 1,40%): T\u1EA1i client_0, g\u00F3i tin REMOVE c\u1EE7a \u0027Item_067\u0027 \u0111\u01B0\u1EE3c x\u1EED l\u00FD tr\u01B0\u1EDBc nh\u01B0ng g\u00F3i tin ADD c\u00F3 timestamp nh\u1ECF h\u01A1n l\u1EA1i \u0111\u1EBFn mu\u1ED9n sau \u0111\u00F3 do Jitter 80ms, khi\u1EBFn Baseline kh\u00F4ng c\u00F3 Tombstone t\u1EF1 \u0111\u1ED9ng th\u00EAm l\u1EA1i \u0027Item_067\u0027 v\u00E0o gi\u1ECF (Resurrection Anomaly).",
+    "CrdtOutcome": "\u0110\u00DANG \u0110\u1EAEN (H\u1ED9i t\u1EE5 c\u1EB7p 100,0%, Kh\u1EDBp Oracle 100,0%, Sai l\u1EC7ch 0,00%): CRDT gi\u1EEF Tombstone trong Remove-Set v\u1EDBi Timestamp l\u1EDBn h\u01A1n n\u00EAn ch\u1EB7n g\u00F3i tin ADD c\u0169 \u0111\u1EBFn tr\u1EC5; m\u1ECDi Replica \u0111\u1EC1u th\u1ED1ng nh\u1EA5t \u0027Item_067\u0027 \u0111\u00E3 b\u1ECB x\u00F3a."
+  },
+  {
+    "CaseId": "ERR_SPLIT_BRAIN_02",
+    "Scenario": "Exp3_NetworkPartition_SplitBrain_Heal",
+    "AffectedItem": "SharedCartItem_001",
+    "OperationHistory": "ADD@(9845, node_0) -\u003E REMOVE@(9879, node_2) (Partition Group 2 [node_2, node_3] x\u00F3a || Partition Group 1 [node_0, node_1] c\u00F2n gi\u1EEF b\u1EA3n sao c\u0169 tr\u01B0\u1EDBc khi n\u1ED1i m\u1EA1ng)",
+    "BaselineOutcome": "H\u1ED8I T\u1EE4 V\u1EC0 TR\u1EA0NG TH\u00C1I SAI (H\u1ED9i t\u1EE5 c\u1EB7p 100,0%, Kh\u1EDBp Oracle 0,0%, Sai l\u1EC7ch 23,78%): Trong l\u00FAc \u0111\u1EE9t m\u1EA1ng (20000 g\u00F3i tin xuy\u00EAn ph\u00E2n v\u00F9ng b\u1ECB ch\u1EB7n), Partition Group 2 [node_2, node_3] \u0111\u00E3 th\u1EF1c hi\u1EC7n REMOVE@(9879, node_2). Khi n\u1ED1i l\u1EA1i m\u1EA1ng v\u00E0 ch\u1EA1y Gather/Broadcast Naive Merge, v\u00EC kh\u00F4ng c\u00F3 Tombstone n\u00EAn \u0027SharedCartItem_001\u0027 t\u1EEB Partition Group 1 [node_0, node_1] b\u1ECB copy ng\u01B0\u1EE3c l\u1EA1i sang to\u00E0n b\u1ED9 4 node.",
+    "CrdtOutcome": "T\u1EF0 PH\u1EE4C H\u1ED2I \u0110\u00DANG \u0110\u1EAEN (H\u1ED9i t\u1EE5 c\u1EB7p 100,0%, Kh\u1EDBp Oracle 100,0%, Sai l\u1EC7ch 0,00%): Khi n\u1ED1i l\u1EA1i m\u1EA1ng, h\u00E0m Merge c\u1EE7a CRDT h\u1EE3p nh\u1EA5t c\u1EA3 Add-Set v\u00E0 Remove-Set (LUB). Tombstone REMOVE@(9879, node_2) t\u1EEB Partition Group 2 [node_2, node_3] gi\u00FAp to\u00E0n b\u1ED9 4 node th\u1ED1ng nh\u1EA5t \u0027SharedCartItem_001\u0027 \u0111\u00E3 b\u1ECB x\u00F3a."
+  }
+]

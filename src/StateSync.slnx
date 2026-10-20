@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="StateSync.Benchmark/StateSync.Benchmark.csproj" />
+  <Project Path="StateSync.Core/StateSync.Core.csproj" />
+  <Project Path="StateSync.NetworkSim/StateSync.NetworkSim.csproj" />
+  <Project Path="StateSync.Server/StateSync.Server.csproj" />
+  <Project Path="StateSync.Tests/StateSync.Tests.csproj" />
+</Solution>
